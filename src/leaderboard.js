@@ -121,7 +121,7 @@ const rankItems = async( topScores, itemType = 'users', format = 'slack' ) => {
           item: itemTitleCase,
           score: score.score
         };
-		break;
+        break;
     }
 
     items.push( output );
@@ -213,12 +213,12 @@ const getForWeb = async( request ) => {
 const getForAPI = async() => {
 
   const scores = await points.retrieveTopScores(),
-      users = await rankItems( scores, 'users', 'api' ),
-      things = await rankItems( scores, 'things', 'api' );
+      users = await rankItems( scores, 'users', 'object' )
 
   const data = {
-    users,
-    things
+	success: true,
+    data: users,
+	message: 'Top users retrieved'
   };
 
   return data;
