@@ -96,6 +96,9 @@ const handleGet = async( request, response ) => {
           .send( 'Sorry, this link is no longer valid. Please request a new link in Slack.' );
       }
       break;
+    case '/top':
+      response.json(await leaderboard.getForAPI());
+      break;
 
     // A simple default GET response is sometimes useful for troubleshooting.
     default:

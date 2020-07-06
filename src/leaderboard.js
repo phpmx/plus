@@ -71,6 +71,17 @@ const rankItems = async( topScores, itemType = 'users', format = 'slack' ) => {
 
     // For users, we need to link the item (for Slack) or get their real name (for other formats).
     if ( isUser ) {
+      switch(format) {
+        case 'slack':
+          item = (await slack.getUserName( item ));
+          break;
+        case 'item':
+          item = (helpers.maybeLinkItem( item ));
+          break;
+        case 'api':
+          item = (helpers.returnAsId(item));
+          break;
+      }
       item = (
         'slack' === format ? helpers.maybeLinkItem( item ) : await slack.getUserName( item )
       );
@@ -104,6 +115,13 @@ const rankItems = async( topScores, itemType = 'users', format = 'slack' ) => {
           score: score.score + ' point' + plural
         };
         break;
+	  case 'api':
+		output = {
+          rank,
+          item: itemTitleCase,
+          score: score.score
+        };
+		break;
     }
 
     items.push( output );
@@ -189,6 +207,24 @@ const getForWeb = async( request ) => {
 }; // GetForWeb.
 
 /**
+ *
+ * @returns {Promise<{things: *, users: *}>}
+ */
+const getForAPI = async() => {
+
+  const scores = await points.retrieveTopScores(),
+      users = await rankItems( scores, 'users', 'api' ),
+      things = await rankItems( scores, 'things', 'api' );
+
+  const data = {
+    users,
+    things
+  };
+
+  return data;
+};
+
+/**
  * The default handler for this command when invoked over Slack.
  *
  * @param {*} event   See the documentation for getForSlack.
@@ -204,5 +240,6 @@ module.exports = {
   rankItems,
   getForSlack,
   getForWeb,
+  getForAPI,
   handler
 };

@@ -196,6 +196,10 @@ const maybeLinkItem = (item) => {
   return isUser(item) ? '<@' + item + '>' : item;
 };
 
+const returnAsId = (item) => {
+  return item;
+}
+
 /**
  * Renders HTML for the browser, using Handlebars. Includes a standard header and footer.
  *
@@ -251,5 +255,6 @@ module.exports = {
   isTimeBasedTokenStillValid,
   isUser,
   maybeLinkItem,
+  returnAsId,
   render
 };
