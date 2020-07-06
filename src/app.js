@@ -8,8 +8,6 @@
  * @author Tim Malone <tdmalone@gmail.com>
  */
 
-/* global jest */
-
 'use strict';
 
 const events = require( './events' ),
@@ -97,7 +95,7 @@ const handleGet = async( request, response ) => {
       }
       break;
     case '/top':
-      response.json(await leaderboard.getForAPI());
+      response.json( await leaderboard.getForAPI() );
       break;
 
     // A simple default GET response is sometimes useful for troubleshooting.

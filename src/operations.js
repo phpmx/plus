@@ -19,7 +19,7 @@ const operations = {
  */
 const getOperationName = ( operation ) => {
   let operationName = '';
-  console.log('Operation: ' + operation);
+  console.log( 'Operation: ' + operation );
 
   /* eslint-disable max-statements-per-line */
   switch ( operation ) {

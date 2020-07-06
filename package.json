@@ -6,7 +6,9 @@
   "repository": "https://github.com/phpmx/plus",
   "author": "PHP México",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "lint": "eslint ."
+  },
   "engines": {
     "node": "12.16"
   },

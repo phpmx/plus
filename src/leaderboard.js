@@ -71,15 +71,15 @@ const rankItems = async( topScores, itemType = 'users', format = 'slack' ) => {
 
     // For users, we need to link the item (for Slack) or get their real name (for other formats).
     if ( isUser ) {
-      switch(format) {
+      switch ( format ) {
         case 'slack':
-          item = (await slack.getUserName( item ));
+          item = ( await slack.getUserName( item ) );
           break;
         case 'item':
-          item = (helpers.maybeLinkItem( item ));
+          item = ( helpers.maybeLinkItem( item ) );
           break;
         case 'api':
-          item = (helpers.returnAsId(item));
+          item = ( helpers.returnAsId( item ) );
           break;
       }
       item = (
@@ -115,8 +115,8 @@ const rankItems = async( topScores, itemType = 'users', format = 'slack' ) => {
           score: score.score + ' point' + plural
         };
         break;
-	  case 'api':
-		output = {
+      case 'api':
+        output = {
           rank,
           item: itemTitleCase,
           score: score.score
@@ -209,16 +209,17 @@ const getForWeb = async( request ) => {
 /**
  *
  * @returns {Promise<{things: *, users: *}>}
+ *   Data with top users.
  */
 const getForAPI = async() => {
 
   const scores = await points.retrieveTopScores(),
-      users = await rankItems( scores, 'users', 'object' )
+        users = await rankItems( scores, 'users', 'object' );
 
   const data = {
-	success: true,
+    success: true,
     data: users,
-	message: 'Top users retrieved'
+    message: 'Top users retrieved'
   };
 
   return data;
