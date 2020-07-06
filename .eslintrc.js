@@ -8,7 +8,7 @@
 'use strict';
 
 module.exports = {
-  extends: [ 'tdmalone' ], // @see https://github.com/tdmalone/eslint-config-tdmalone
+  extends: [ 'tdmalone' ], 
   rules: {
     'max-statements': [ 'error', { max: 20 } ]
   }

@@ -1,28 +1,19 @@
 {
   "name": "working-plusplus",
-  "version": "0.0.4",
-  "description": "Like plusplus.chat, but one that actually works, because you can host it yourself 😉",
+  "version": "0.0.5",
+  "description": "PHP México PlusPlus bot",
   "main": "index.js",
-  "repository": "git@github.com:tdmalone/working-plusplus.git",
-  "author": "Tim Malone <tdmalone@gmail.com>",
+  "repository": "https://github.com/phpmx/plus",
+  "author": "PHP México",
   "license": "MIT",
-  "scripts": {
-    "lint": "eslint --color --ignore-pattern '/coverage/' --ignore-pattern '!.*.js' \"**/*.js\"",
-    "fix": "yarn lint --fix",
-    "test": "jest --forceExit --runInBand",
-    "unit-tests": "SKIP_INTEGRATION_TESTS=true SKIP_E2E_TESTS=true jest --forceExit",
-    "integration-tests": "SKIP_E2E_TESTS=true jest --forceExit integration-tests",
-    "e2e-tests": "SKIP_INTEGRATION_TESTS=true jest --forceExit e2e-tests",
-    "report-coverage": "cat ./coverage/lcov.info | coveralls"
-  },
+  "scripts": {},
   "engines": {
-    "node": "10.11.0"
+    "node": "12.16"
   },
   "keywords": [
     "slack",
     "bot",
-    "karma",
-    "heroku"
+    "karma"
   ],
   "dependencies": {
     "@slack/client": "^4.3.1",

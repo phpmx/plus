@@ -3,7 +3,7 @@ version: '3'
 
 services:
   web:
-    image: node:10.11
+    image: node:12.16
     expose:
       - 80
     volumes:
