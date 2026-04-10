@@ -21,7 +21,7 @@ let slack, users;
  *                           https://github.com/slackapi/node-slack-sdk/blob/master/src/WebClient.ts
  * @returns {void}
  */
-const setSlackClient = ( client ) => {
+export const setSlackClient = ( client ) => {
   slack = client;
 };
 
@@ -30,25 +30,29 @@ const setSlackClient = ( client ) => {
  *
  * @returns {object} A collection of Slack user objects, indexed by the user IDs (Uxxxxxxxx).
  */
-const getUserList = async() => {
+export const getUserList = async() => {
 
   if ( users ) {
     return users;
   }
 
-  console.log( 'Retrieving user list from Slack.' );
+  console.log( 'Retrieving user list from Slack...' );
 
-  users = {};
-  const userList = await slack.users.list();
-
-  if ( ! userList.ok ) {
-    throw Error( 'Error occurred retrieving user list from Slack.' );
+  try {
+    const userList = await slack.users.list();
+    if ( !userList.ok ) {
+      console.error( 'Error retrieving user list from Slack:', userList.error );
+      throw new Error( 'Error retrieving user list from Slack: ' + userList.error );
+    }
+    console.log( `Successfully retrieved ${userList.members.length} users.` );
+    users = {};
+    for ( const user of userList.members ) {
+      users[ user.id ] = user;
+    }
+  } catch ( error ) {
+    console.error( 'Fatal error retrieving user list from Slack:', error );
+    throw error;
   }
-
-  for ( const user of userList.members ) {
-    users[ user.id ] = user;
-  }
-
   return users;
 
 }; // GetUserList.
@@ -61,7 +65,7 @@ const getUserList = async() => {
  * @param {bool}   username Whether the username should always be returned instead of the real name.
  * @returns {string} The user's real name, as per their Slack profile.
  */
-const getUserName = async( userId, username = false ) => {
+export const getUserName = async( userId, username = false ) => {
 
   const users = await getUserList(),
         user = users[ userId ];
@@ -84,35 +88,32 @@ const getUserName = async( userId, username = false ) => {
  *                                be provided as part of the payload in the previous argument.
  * @return {Promise} A Promise to send the message to Slack.
  */
-const sendMessage = ( text, channel ) => {
+export const sendMessage = async( text, channel ) => {
 
   let payload = {
     channel,
     text
   };
 
-  // If 'text' was provided as an object instead, merge it into the payload.
   if ( 'object' === typeof text ) {
     delete payload.text;
     payload = Object.assign( payload, text );
   }
 
-  return new Promise( ( resolve, reject ) => {
-    slack.chat.postMessage( payload ).then( ( data ) => {
+  try {
+    const data = await slack.chat.postMessage( payload );
+    if ( !data.ok ) {
+      console.error( 'Error posting Slack message:', data.error );
+      throw new Error( data.error );
+    }
+  } catch ( error ) {
+    console.error( 'Fatal error sending Slack message:', error );
+    throw error;
+  }
 
-      if ( ! data.ok ) {
-        console.error( 'Error occurred posting response.' );
-        return reject();
-      }
-
-      resolve();
-
-    });
-
-  }); // Return new Promise.
 }; // SendMessage.
 
-module.exports = {
+export default {
   setSlackClient,
   getUserList,
   getUserName,

@@ -9,19 +9,28 @@
 
 'use strict';
 
-const app = require( './src/app' ),
-      slack = require( './src/slack' );
-
-const fs = require( 'fs' ),
-      mime = require( 'mime' ),
-      express = require( 'express' ),
-      bodyParser = require( 'body-parser' ),
-      slackClient = require( '@slack/client' );
+import app from './src/app.js';
+import slack from './src/slack.js';
+import express from 'express';
+import fs from 'fs';
+import mime from 'mime';
+import bodyParser from 'body-parser';
+import slackClient from '@slack/client';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
 /* eslint-disable no-process-env, no-magic-numbers */
 const PORT = process.env.PORT || 80; // Let Heroku set the port.
 const SLACK_OAUTH_ACCESS_TOKEN = process.env.SLACK_BOT_USER_OAUTH_ACCESS_TOKEN;
 /* eslint-enable no-process-env, no-magic-numbers */
+
+if (!SLACK_OAUTH_ACCESS_TOKEN) {
+  console.error(
+    'FATAL: SLACK_BOT_USER_OAUTH_ACCESS_TOKEN no está configurada. La aplicación no podrá comunicarse con la API de Slack.'
+  );
+} else {
+  console.log('SLACK_BOT_USER_OAUTH_ACCESS_TOKEN detectado.');
+}
 
 /**
  * Starts the server and bootstraps the app.
@@ -34,38 +43,36 @@ const SLACK_OAUTH_ACCESS_TOKEN = process.env.SLACK_BOT_USER_OAUTH_ACCESS_TOKEN;
  *                        https://nodejs.org/api/http.html#http_class_http_server for details.
  */
 const bootstrap = ( options = {}) => {
-
-  // Allow alternative implementations of both Express and Slack to be passed in.
   const server = options.express || express();
   slack.setSlackClient( options.slack || new slackClient.WebClient( SLACK_OAUTH_ACCESS_TOKEN ) );
 
+  const __dirname = path.dirname( fileURLToPath( import.meta.url ) );
+  server.use( express.static( path.join( __dirname, 'public' ) ) );
   server.use( bodyParser.json() );
   server.enable( 'trust proxy' );
   server.get( '/', app.handleGet );
   server.post( '/', app.handlePost );
 
-  // Static assets.
-  server.get( '/assets/*file', ( request, response ) => {
-    const path = 'src/' + request._parsedUrl.path,
-          type = mime.getType( path );
-
-    response.setHeader( 'Content-Type', type );
-    response.send( fs.readFileSync( path ) );
+  // Favicon route - serves from the 'public' directory at the project root.
+  server.get( '/favicon.ico', ( request, response ) => {
+    response.sendFile( path.join( __dirname, 'public', 'favicon.ico' ) );
   });
 
   // Additional routes.
   server.get( '/leaderboard', app.handleGet );
   server.get( '/top', app.handleGet );
 
-  return server.listen( PORT, () => {
-    console.log( 'Listening on port ' + PORT + '.' );
-  });
+  return server;
 
 }; // Bootstrap.
 
+const server = bootstrap();
+
 // If module was called directly, bootstrap now.
-if ( require.main === module ) {
-  bootstrap();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  server.listen( PORT, () => {
+    console.log( 'Listening on port ' + PORT + '.' );
+  });
 }
 
-module.exports = bootstrap;
+export default server;

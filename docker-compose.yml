@@ -1,23 +1,25 @@
 services:
   web:
     image: node:lts-slim
-    expose:
-      - 80
+    ports:
+      - 80:80
     volumes:
       - ./:/app
     working_dir: /app
     environment:
-      - DATABASE_URL=postgresql://postgres:toor@db:5432/plus
-      - SLACK_VERIFICATION_TOKEN=
+      - MONGODB_URI=mongodb://db:27017/plus
+      - MONGODB_DB=plus
+      - SLACK_VERIFICATION_TOKEN=xxxxxxxxxxxxxxxxxxxxxxx1
       - SLACK_BOT_USER_OAUTH_ACCESS_TOKEN=
       - YARN_PRODUCTION=true
-      - DATABASE_USE_SSL=false
     entrypoint: node index.js
-    links:
+    depends_on:
       - db
 
   db:
-    image: postgres:10
-    environment:
-      - POSTGRES_PASSWORD=toor
-      - POSTGRES_DB=plus
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:

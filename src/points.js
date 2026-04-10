@@ -2,7 +2,7 @@
  * All the stuff that handles the giving, taking away, or otherwise querying of points.
  *
  * NOTE: As the functions here pretty much deal exclusively with the database, they generally
- *       aren't unit tested, as that would require anyone who runs the tests to also have a Postgres
+ *       aren't unit tested, as that would require anyone who runs the tests to also have a MongoDB
  *       server. Instead, the functions in this file are well covered via the integration and
  *       end-to-end tests.
  *
@@ -11,20 +11,64 @@
 
 'use strict';
 
-const pg = require( 'pg' );
+import mongoose from 'mongoose';
 
 /* eslint-disable no-process-env */
-const DATABASE_URL = process.env.DATABASE_URL,
-      DATABASE_USE_SSL = 'false' === process.env.DATABASE_USE_SSL ? false : true;
+const MONGODB_DB = process.env.MONGODB_DB || 'plus',
+      SCORES_COLLECTION = process.env.MONGODB_COLLECTION || 'scores';
 /* eslint-enable no-process-env */
 
-const scoresTableName = 'scores',
-      postgresPoolConfig = {
-        connectionString: DATABASE_URL,
-        ssl: DATABASE_USE_SSL
-      };
+let MONGODB_URI;
+if (process.env.plusplus_MONGODB_URI) {
+  console.log('INFO: Variable `plusplus_MONGODB_URI` de la integración de Vercel encontrada. Usando esta URI.');
+  MONGODB_URI = process.env.plusplus_MONGODB_URI;
+} else if (process.env.MONGODB_URI) {
+  console.log('INFO: Variable `MONGODB_URI` estándar encontrada. Usando esta URI.');
+  MONGODB_URI = process.env.MONGODB_URI;
+} else {
+  console.warn('ADVERTENCIA: No se encontraron variables de entorno para MongoDB. Usando el valor por defecto para desarrollo local.');
+  MONGODB_URI = 'mongodb://db:27017/plus';
+}
 
-const postgres = new pg.Pool( postgresPoolConfig );
+if (!MONGODB_URI || MONGODB_URI === 'mongodb://db:27017/plus') {
+  console.error(
+    'FATAL: MONGODB_URI no está configurada o está usando el valor por defecto de desarrollo. La aplicación no podrá conectarse a la base de datos.'
+  );
+} else {
+  console.log(`URI de MongoDB detectada, comenzando con: ${MONGODB_URI.substring(0, 36)}...`);
+}
+
+// --- Mongoose Schema and Model ---
+const ScoreSchema = new mongoose.Schema({
+  item: String,
+  normalizedItem: { type: String, unique: true, index: true },
+  score: { type: Number, default: 0 }
+});
+
+const Score = mongoose.models.Score || mongoose.model('Score', ScoreSchema, SCORES_COLLECTION);
+
+const connectToDatabase = async () => {
+  // Mongoose manages connection pooling automatically.
+  // We check the readyState to prevent multiple connections in serverless environments.
+  if (mongoose.connection.readyState >= 1) {
+    console.log('Using existing database connection.');
+    return;
+  }
+
+  try {
+    console.log('Connecting to MongoDB...');
+    await mongoose.connect(MONGODB_URI, { dbName: MONGODB_DB });
+    console.log('MongoDB Connected Successfully.');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    throw error;
+  }
+};
+
+const getScoreModel = async () => {
+  await connectToDatabase();
+  return Score;
+};
 
 /**
  * Retrieves all scores from the database, ordered from highest to lowest.
@@ -36,15 +80,13 @@ const postgres = new pg.Pool( postgresPoolConfig );
  * @return {array} An array of entries, each an object containing 'item' (string) and 'score'
  *                (integer) properties.
  */
-const retrieveTopScores = async() => {
+export const retrieveTopScores = async() => {
 
-  const query = 'SELECT * FROM ' + scoresTableName + ' ORDER BY score DESC';
+  const ScoreModel = await getScoreModel();
 
-  const dbClient = await postgres.connect(),
-        result = await dbClient.query( query ),
-        scores = result.rows;
-
-  await dbClient.release();
+  const scores = await ScoreModel.find( {}, { _id: 0, item: 1, score: 1 } )
+    .sort( { score: -1 } )
+    .lean();
 
   return scores;
 
@@ -55,45 +97,44 @@ const retrieveTopScores = async() => {
  * into the database with an assumed initial score of 0.
  *
  * This function also sets up the database if it is not already ready, including creating the
- * scores table and activating the Postgres case-insensitive extension.
+ * scores collection and ensuring a case-insensitive index exists.
  *
  * @param {string} item      The Slack user ID (if user) or name (if thing) of the item being
  *                           operated on.
  * @param {string} operation The mathematical operation performed on the item's score.
  * @return {int} The item's new score after the update has been applied.
  */
-const updateScore = async( item, operation ) => {
+export const updateScore = async( item, operation ) => {
 
-  // Connect to the DB, and create a table if it's not yet there.
-  // We also set up the citext extension, so that we can easily be case insensitive.
-  const dbClient = await postgres.connect();
-  await dbClient.query( '\
-    CREATE EXTENSION IF NOT EXISTS citext; \
-    CREATE TABLE IF NOT EXISTS ' + scoresTableName + ' (item CITEXT PRIMARY KEY, score INTEGER); \
-  ' );
+  const ScoreModel = await getScoreModel();
+  const normalizedItem = item.toLowerCase();
+  const increment = '-' === operation ? -1 : 1;
 
-  // Atomically record the action.
-  // TODO: Fix potential SQL injection issues here, even though we know the input should be safe.
-  await dbClient.query( '\
-    INSERT INTO ' + scoresTableName + ' VALUES (\'' + item + '\', ' + operation + '1) \
-    ON CONFLICT (item) DO UPDATE SET score = ' + scoresTableName + '.score ' + operation + ' 1; \
-  ' );
-
-  // Get the new value.
-  // TODO: Fix potential SQL injection issues here, even though we know the input should be safe.
-  const dbSelect = await dbClient.query( '\
-    SELECT score FROM ' + scoresTableName + ' WHERE item = \'' + item + '\'; \
-  ' );
-
-  await dbClient.release();
-  const score = dbSelect.rows[0].score;
-
+  let result;
+  try {
+    console.log(`Attempting to update score for: ${item}`);
+    result = await ScoreModel.findOneAndUpdate(
+      { normalizedItem },
+      {
+        $set: { item, normalizedItem },
+        $inc: { score: increment }
+      },
+      { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
+    );
+    console.log(`Successfully updated score for: ${item}`);
+  } catch (err) {
+    console.error(`Error updating score for ${item}:`, err);
+    throw err;
+  }
+  
+  const score = result?.score ?? 0;
+  
   console.log( item + ' now on ' + score );
   return score;
 
 }; // UpdateScore.
 
-module.exports = {
+export default {
   retrieveTopScores,
   updateScore
 };

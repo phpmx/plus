@@ -6,11 +6,11 @@
 
 'use strict';
 
-const slack = require( './slack' ),
-      points = require( './points' ),
-      helpers = require( './helpers' );
+import slack from './slack.js';
+import points from './points.js';
+import helpers from './helpers.js';
 
-const querystring = require( 'querystring' );
+import querystring from 'querystring';
 
 /**
  * Gets the URL for the full leaderboard, including a token to ensure that it is only viewed by
@@ -19,7 +19,7 @@ const querystring = require( 'querystring' );
  * @param {object} request The Express request object that resulted in this handler being run.
  * @returns {string} The leaderboard URL, which will be picked up in ../index.js when called.
  */
-const getLeaderboardUrl = ( request ) => {
+export const getLeaderboardUrl = ( request ) => {
 
   const hostname = request.headers.host,
         ts = helpers.getTimestamp();
@@ -54,40 +54,35 @@ const getLeaderboardUrl = ( request ) => {
  *                  format is 'slack') or objects containing 'rank', 'item' and 'score' values (if
  *                  format is 'object').
  */
-const rankItems = async( topScores, itemType = 'users', format = 'slack' ) => {
+export const rankItems = async( topScores, itemType = 'users', format = 'slack', userList = null ) => {
 
   let lastScore, lastRank, output;
   const items = [];
 
+  // If we are ranking users and don't have a user list, fetch it once as a fallback.
+  if ( itemType === 'users' && !userList ) {
+    userList = await slack.getUserList();
+  }
+
   for ( const score of topScores ) {
 
-    let item = score.item;
-    const isUser = helpers.isUser( score.item ) ? true : false;
+    const isUser = helpers.isUser( score.item );
 
     // Skip if this item is not the item type we're ranking.
-    if ( isUser && 'users' !== itemType || ! isUser && 'users' === itemType ) {
+    if ( ( isUser && 'users' !== itemType ) || ( !isUser && 'users' === itemType ) ) {
       continue;
     }
 
-    // For users, we need to link the item (for Slack) or get their real name (for other formats).
+    let displayName;
     if ( isUser ) {
-      switch ( format ) {
-        case 'slack':
-          item = ( await slack.getUserName( item ) );
-          break;
-        case 'item':
-          item = ( helpers.maybeLinkItem( item ) );
-          break;
-        case 'api':
-          item = ( helpers.returnAsId( item ) );
-          break;
-      }
-      item = (
-        'slack' === format ? helpers.maybeLinkItem( item ) : await slack.getUserName( item )
-      );
+      const userObject = userList ? userList[score.item] : null;
+      const userName = userObject ? ( userObject.profile.real_name || userObject.name ) : '(unknown)';
+      displayName = 'slack' === format ? helpers.maybeLinkItem( score.item ) : userName;
+    } else {
+      displayName = score.item;
     }
 
-    const itemTitleCase = item.substring( 0, 1 ).toUpperCase() + item.substring( 1 ),
+    const itemTitleCase = displayName.substring( 0, 1 ).toUpperCase() + displayName.substring( 1 ),
           plural = helpers.isPlural( score.score ) ? 's' : '';
 
     // Determine the rank by keeping it the same as the last user if the score is the same, or
@@ -98,7 +93,7 @@ const rankItems = async( topScores, itemType = 'users', format = 'slack' ) => {
       case 'slack':
 
         output = (
-          rank + '. ' + itemTitleCase + ' [' + score.score + ' point' + plural + ']'
+          rank + '. ' + displayName + ' [' + score.score + ' point' + plural + ']'
         );
 
         // If this is the first item, it's the winner!
@@ -118,7 +113,7 @@ const rankItems = async( topScores, itemType = 'users', format = 'slack' ) => {
       case 'api':
         output = {
           rank,
-          item: itemTitleCase,
+          item: displayName,
           score: score.score
         };
         break;
@@ -145,13 +140,15 @@ const rankItems = async( topScores, itemType = 'users', format = 'slack' ) => {
  * @param {object} request The Express request object that resulted in this handler being run.
  * @returns {Promise} A Promise to send the Slack message.
  */
-const getForSlack = async( event, request ) => {
+export const getForSlack = async( event, request ) => {
 
   const limit = 5;
 
   const scores = await points.retrieveTopScores(),
-        users = await rankItems( scores, 'users' ),
-        things = await rankItems( scores, 'things' );
+        // Pre-fetch user list to avoid multiple API calls inside the loop.
+        userList = await slack.getUserList(),
+        users = await rankItems( scores, 'users', 'slack', userList ),
+        things = await rankItems( scores, 'things', 'slack' );
 
   const messageText = (
     'Aquí tienes. ' +
@@ -190,10 +187,11 @@ const getForSlack = async( event, request ) => {
  * @param {object} request The Express request object that resulted in this handler being run.
  * @returns {string} HTML for the browser.
  */
-const getForWeb = async( request ) => {
+export const getForWeb = async( request ) => {
 
   const scores = await points.retrieveTopScores(),
-        users = await rankItems( scores, 'users', 'object' ),
+        userList = await slack.getUserList(),
+        users = await rankItems( scores, 'users', 'object', userList ),
         things = await rankItems( scores, 'things', 'object' );
 
   const data = {
@@ -211,10 +209,11 @@ const getForWeb = async( request ) => {
  * @returns {Promise<{things: *, users: *}>}
  *   Data with top users.
  */
-const getForAPI = async() => {
+export const getForAPI = async() => {
 
   const scores = await points.retrieveTopScores(),
-        users = await rankItems( scores, 'users', 'object' );
+        userList = await slack.getUserList(),
+        users = await rankItems( scores, 'users', 'api', userList );
 
   const data = {
     success: true,
@@ -232,11 +231,11 @@ const getForAPI = async() => {
  * @param {*} request See the documentation for getForSlack.
  * @returns {*} See the documentation for getForSlack.
  */
-const handler = async( event, request ) => {
+export const handler = async( event, request ) => {
   return getForSlack( event, request );
 };
 
-module.exports = {
+export default {
   getLeaderboardUrl,
   rankItems,
   getForSlack,

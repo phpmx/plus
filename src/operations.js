@@ -4,7 +4,7 @@
 
 'use strict';
 
-const operations = {
+export const operations = {
   PLUS: 'plus',
   MINUS: 'minus',
   SELF: 'selfPlus',
@@ -17,13 +17,13 @@ const operations = {
  * @param {string} operation A mathematical operation such as '+' or '-'.
  * @return {string} The name of the operation.
  */
-const getOperationName = ( operation ) => {
+export const getOperationName = ( operation ) => {
   let operationName = '';
   console.log( 'Operation: ' + operation );
 
   /* eslint-disable max-statements-per-line */
   switch ( operation ) {
-    case '++--': operationName = operation.MINUSPLUS; break;
+    case '++--': operationName = operations.MINUSPLUS; break;
     case '+': operationName = operations.PLUS; break;
     case '-': operationName = operations.MINUS; break;
   }
@@ -33,7 +33,7 @@ const getOperationName = ( operation ) => {
 
 };
 
-module.exports = {
+export default {
   operations,
   getOperationName
 };
